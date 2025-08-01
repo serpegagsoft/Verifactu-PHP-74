@@ -16,10 +16,10 @@ class AeatClient {
     const NS_SUM = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroLR.xsd';
     const NS_SUM1 = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd';
 
-    private readonly ComputerSystem $system;
-    private readonly FiscalIdentifier $taxpayer;
+    private ComputerSystem $system;
+    private FiscalIdentifier $taxpayer;
     private ?FiscalIdentifier $representative = null;
-    private readonly Client $client;
+    private Client $client;
     private bool $isProduction = true;
 
     /**
@@ -34,7 +34,7 @@ class AeatClient {
         ComputerSystem $system,
         FiscalIdentifier $taxpayer,
         string $certPath,
-        ?string $certPassword = null,
+        ?string $certPassword = null
     ) {
         $this->system = $system;
         $this->taxpayer = $taxpayer;
@@ -54,7 +54,7 @@ class AeatClient {
      * @param  FiscalIdentifier|null $representative Representative details (party that sends the invoices)
      * @return $this                                 This instance
      */
-    public function setRepresentative(?FiscalIdentifier $representative): static {
+    public function setRepresentative(?FiscalIdentifier $representative) {
         $this->representative = $representative;
         return $this;
     }
@@ -65,7 +65,7 @@ class AeatClient {
      * @param  bool  $production Pass `true` for production, `false` for testing
      * @return $this             This instance
      */
-    public function setProduction(bool $production): static {
+    public function setProduction(bool $production) {
         $this->isProduction = $production;
         return $this;
     }
