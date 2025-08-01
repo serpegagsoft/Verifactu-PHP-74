@@ -1,5 +1,5 @@
 {
-    "name": "josemmo/verifactu-php",
+    "name": "serpegagsoft/verifactu-php-74",
     "description": "Librería para la implementación del sistema VERI*FACTU de la AEAT española",
     "keywords": ["verifactu", "aeat", "sii"],
     "license": "MIT",
