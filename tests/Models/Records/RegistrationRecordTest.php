@@ -72,7 +72,6 @@ final class RegistrationRecordTest extends TestCase {
         $record->validate();
     }
 
-    #[DoesNotPerformAssertions]
     public function testValidatesTotalAmounts(): void {
         $record = new RegistrationRecord();
         $record->invoiceId = new InvoiceIdentifier();

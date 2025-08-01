@@ -1,7 +1,7 @@
 <?php
 namespace josemmo\Verifactu\Models;
 
-use Symfony\Component\Validator\Constraints as Assert;
+use josemmo\Verifactu\Validation\Constraints as Assert;
 
 /**
  * Computer system
@@ -14,8 +14,6 @@ class ComputerSystem extends Model {
      *
      * @field NombreRazon
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 120)]
     public string $vendorName;
 
     /**
@@ -23,8 +21,6 @@ class ComputerSystem extends Model {
      *
      * @field NIF
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(exactly: 9)]
     public string $vendorNif;
 
     /**
@@ -32,8 +28,6 @@ class ComputerSystem extends Model {
      *
      * @field NombreSistemaInformatico
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 30)]
     public string $name;
 
     /**
@@ -41,8 +35,6 @@ class ComputerSystem extends Model {
      *
      * @field IdSistemaInformatico
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 2)]
     public string $id;
 
     /**
@@ -50,8 +42,6 @@ class ComputerSystem extends Model {
      *
      * @field Version
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 50)]
     public string $version;
 
     /**
@@ -59,8 +49,6 @@ class ComputerSystem extends Model {
      *
      * @field NumeroInstalacion
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 100)]
     public string $installationNumber;
 
     /**
@@ -68,7 +56,6 @@ class ComputerSystem extends Model {
      *
      * @field TipoUsoPosibleSoloVerifactu
      */
-    #[Assert\Type('boolean')]
     public bool $onlySupportsVerifactu;
 
     /**
@@ -76,7 +63,6 @@ class ComputerSystem extends Model {
      *
      * @field TipoUsoPosibleMultiOT
      */
-    #[Assert\Type('boolean')]
     public bool $supportsMultipleTaxpayers;
 
     /**
@@ -84,6 +70,19 @@ class ComputerSystem extends Model {
      *
      * @field IndicadorMultiplesOT
      */
-    #[Assert\Type('boolean')]
     public bool $hasMultipleTaxpayers;
+
+    public function getConstraints(): array {
+        return [
+            'vendorName' => [new Assert\NotBlank(), new Assert\Length(['max' => 120])],
+            'vendorNif' => [new Assert\NotBlank(), new Assert\Length(['exactly' => 9])],
+            'name' => [new Assert\NotBlank(), new Assert\Length(['max' => 30])],
+            'id' => [new Assert\NotBlank(), new Assert\Length(['max' => 2])],
+            'version' => [new Assert\NotBlank(), new Assert\Length(['max' => 50])],
+            'installationNumber' => [new Assert\NotBlank(), new Assert\Length(['max' => 100])],
+            'onlySupportsVerifactu' => [new Assert\Type('boolean')],
+            'supportsMultipleTaxpayers' => [new Assert\Type('boolean')],
+            'hasMultipleTaxpayers' => [new Assert\Type('boolean')],
+        ];
+    }
 }

@@ -2,20 +2,20 @@
 namespace josemmo\Verifactu\Exceptions;
 
 use RuntimeException;
-use Symfony\Component\Validator\ConstraintViolationListInterface;
+use josemmo\Verifactu\Validation\ConstraintViolationList;
 
 /**
  * Exception thrown when a model class does not pass validation
  */
 class InvalidModelException extends RuntimeException {
-    public readonly ConstraintViolationListInterface $violations;
+    public ConstraintViolationList $violations;
 
     /**
      * Class constructor
      *
-     * @param ConstraintViolationListInterface $violations Constraint violations
+     * @param ConstraintViolationList $violations Constraint violations
      */
-    public function __construct(ConstraintViolationListInterface $violations) {
+    public function __construct(ConstraintViolationList $violations) {
         $this->violations = $violations;
         parent::__construct("Invalid instance of model class:\n" . $this->getHumanRepresentation());
     }

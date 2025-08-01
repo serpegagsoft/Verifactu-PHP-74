@@ -2,8 +2,8 @@
 namespace josemmo\Verifactu\Models\Records;
 
 use DateTimeImmutable;
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
+use josemmo\Verifactu\Validation\Constraints as Assert;
+use josemmo\Verifactu\Validation\ConstraintViolationList;
 use josemmo\Verifactu\Models\Model;
 
 /**
@@ -15,8 +15,6 @@ abstract class Record extends Model {
      *
      * @field IDFactura
      */
-    #[Assert\NotBlank]
-    #[Assert\Valid]
     public InvoiceIdentifier $invoiceId;
 
     /**
@@ -24,7 +22,6 @@ abstract class Record extends Model {
      *
      * @field Encadenamiento/RegistroAnterior
      */
-    #[Assert\Valid]
     public ?InvoiceIdentifier $previousInvoiceId;
 
     /**
@@ -32,7 +29,6 @@ abstract class Record extends Model {
      *
      * @field Encadenamiento/RegistroAnterior/Huella
      */
-    #[Assert\Regex(pattern: '/^[0-9A-F]{64}$/')]
     public ?string $previousHash;
 
     /**
@@ -40,8 +36,6 @@ abstract class Record extends Model {
      *
      * @field Huella
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^[0-9A-F]{64}$/')]
     public string $hash;
 
     /**
@@ -49,7 +43,6 @@ abstract class Record extends Model {
      *
      * @field FechaHoraHusoGenRegistro
      */
-    #[Assert\NotBlank]
     public DateTimeImmutable $hashedAt;
 
     /**
@@ -59,16 +52,36 @@ abstract class Record extends Model {
      */
     abstract public function calculateHash(): string;
 
-    #[Assert\Callback]
-    final public function validatePreviousInvoice(ExecutionContextInterface $context): void {
+    public function getConstraints(): array {
+        return [
+            'invoiceId' => [new Assert\NotBlank(), new Assert\Valid()],
+            'previousInvoiceId' => [new Assert\Valid()],
+            'previousHash' => [new Assert\Callback([$this, 'validatePreviousHash'])],
+            'hash' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^[0-9A-F]{64}$/'])],
+            'hashedAt' => [new Assert\NotBlank()],
+            'previousInvoiceId' => [new Assert\Callback([$this, 'validatePreviousInvoice'])],
+        ];
+    }
+
+    final public function validatePreviousInvoice(ConstraintViolationList $violations): void {
         if ($this->previousInvoiceId !== null && $this->previousHash === null) {
-            $context->buildViolation('Previous hash is required if previous invoice ID is provided')
-                ->atPath('previousHash')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                'Previous hash is required if previous invoice ID is provided',
+                'previousHash'
+            ));
         } elseif ($this->previousHash !== null && $this->previousInvoiceId === null) {
-            $context->buildViolation('Previous invoice ID is required if previous hash is provided')
-                ->atPath('previousInvoiceId')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                'Previous invoice ID is required if previous hash is provided',
+                'previousInvoiceId'
+            ));
         }
+    }
+
+    final public function validatePreviousHash(ConstraintViolationList $violations): void {
+        if ($this->previousHash === null) {
+            return;
+        }
+        $constraint = new Assert\Regex(['pattern' => '/^[0-9A-F]{64}$/']);
+        $constraint->validate($this->previousHash, 'previousHash', $violations);
     }
 }

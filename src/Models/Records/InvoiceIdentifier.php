@@ -2,7 +2,7 @@
 namespace josemmo\Verifactu\Models\Records;
 
 use DateTimeImmutable;
-use Symfony\Component\Validator\Constraints as Assert;
+use josemmo\Verifactu\Validation\Constraints as Assert;
 use josemmo\Verifactu\Models\Model;
 
 /**
@@ -19,7 +19,7 @@ class InvoiceIdentifier extends Model {
     public function __construct(
         ?string $issuerId = null,
         ?string $invoiceNumber = null,
-        ?DateTimeImmutable $issueDate = null,
+        ?DateTimeImmutable $issueDate = null
     ) {
         if ($issuerId !== null) {
             $this->issuerId = $issuerId;
@@ -37,8 +37,6 @@ class InvoiceIdentifier extends Model {
      *
      * @field IDFactura/IDEmisorFactura
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(exactly: 9)]
     public string $issuerId;
 
     /**
@@ -46,8 +44,6 @@ class InvoiceIdentifier extends Model {
      *
      * @field IDFactura/NumSerieFactura
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 60)]
     public string $invoiceNumber;
 
     /**
@@ -57,6 +53,13 @@ class InvoiceIdentifier extends Model {
      *
      * @field IDFactura/FechaExpedicionFactura
      */
-    #[Assert\NotBlank]
     public DateTimeImmutable $issueDate;
+
+    public function getConstraints(): array {
+        return [
+            'issuerId' => [new Assert\NotBlank(), new Assert\Length(['exactly' => 9])],
+            'invoiceNumber' => [new Assert\NotBlank(), new Assert\Length(['max' => 60])],
+            'issueDate' => [new Assert\NotBlank()],
+        ];
+    }
 }

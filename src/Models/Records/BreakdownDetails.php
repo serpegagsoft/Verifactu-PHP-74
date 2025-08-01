@@ -1,8 +1,8 @@
 <?php
 namespace josemmo\Verifactu\Models\Records;
 
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
+use josemmo\Verifactu\Validation\Constraints as Assert;
+use josemmo\Verifactu\Validation\ConstraintViolationList;
 use josemmo\Verifactu\Models\Model;
 
 /**
@@ -16,32 +16,27 @@ class BreakdownDetails extends Model {
      *
      * @field Impuesto
      */
-    #[Assert\NotBlank]
-    public TaxType $taxType;
+    public $taxType;
 
     /**
      * Clave que identifica el tipo de régimen del impuesto o una operación con trascendencia tributaria
      *
      * @field ClaveRegimen
      */
-    #[Assert\NotBlank]
-    public RegimeType $regimeType;
+    public $regimeType;
 
     /**
      * Clave de la operación sujeta y no exenta o de la operación no sujeta
      *
      * @field CalificacionOperacion
      */
-    #[Assert\NotBlank]
-    public OperationType $operationType;
+    public $operationType;
 
     /**
      * Porcentaje aplicado sobre la base imponible para calcular la cuota
      *
      * @field TipoImpositivo
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^\d{1,3}\.\d{2}$/')]
     public string $taxRate;
 
     /**
@@ -49,8 +44,6 @@ class BreakdownDetails extends Model {
      *
      * @field BaseImponibleOimporteNoSujeto
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^-?\d{1,12}\.\d{2}$/')]
     public string $baseAmount;
 
     /**
@@ -58,12 +51,24 @@ class BreakdownDetails extends Model {
      *
      * @field CuotaRepercutida
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^-?\d{1,12}\.\d{2}$/')]
     public string $taxAmount;
 
-    #[Assert\Callback]
-    final public function validateTaxAmount(ExecutionContextInterface $context): void {
+    public function getConstraints(): array {
+        return [
+            'taxType' => [new Assert\NotBlank()],
+            'regimeType' => [new Assert\NotBlank()],
+            'operationType' => [new Assert\NotBlank()],
+            'taxRate' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^\d{1,3}\.\d{2}$/'])],
+            'baseAmount' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^-?\d{1,12}\.\d{2}$/'])],
+            'taxAmount' => [
+                new Assert\NotBlank(),
+                new Assert\Regex(['pattern' => '/^-?\d{1,12}\.\d{2}$/']),
+                new Assert\Callback([$this, 'validateTaxAmount'])
+            ],
+        ];
+    }
+
+    final public function validateTaxAmount(ConstraintViolationList $violations): void {
         if (!isset($this->taxRate) || !isset($this->baseAmount) || !isset($this->taxAmount)) {
             return;
         }
@@ -79,9 +84,10 @@ class BreakdownDetails extends Model {
         }
         if (!$validTaxAmount) {
             $bestTaxAmount = number_format($bestTaxAmount, 2, '.', '');
-            $context->buildViolation("Expected tax amount of $bestTaxAmount, got {$this->taxAmount}")
-                ->atPath('taxAmount')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                "Expected tax amount of $bestTaxAmount, got {$this->taxAmount}",
+                'taxAmount'
+            ));
         }
     }
 }

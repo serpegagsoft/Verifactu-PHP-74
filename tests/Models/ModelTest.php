@@ -3,27 +3,29 @@ namespace josemmo\Verifactu\Tests\Models;
 
 use PHPUnit\Framework\Attributes\DoesNotPerformAssertions;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Validator\Constraints as Assert;
+use josemmo\Verifactu\Validation\Constraints as Assert;
 use josemmo\Verifactu\Exceptions\InvalidModelException;
 use josemmo\Verifactu\Models\Model;
 
 class SampleModel extends Model {
-    #[Assert\NotBlank]
-    #[Assert\Length(exactly: 4)]
     public string $name;
-
-    #[Assert\NotBlank]
-    #[Assert\Positive]
     public int $quantity;
+
+    public function getConstraints(): array {
+        return [
+            'name' => [new Assert\NotBlank(), new Assert\Length(['exactly' => 4])],
+            'quantity' => [new Assert\NotBlank(), new Assert\Positive()],
+        ];
+    }
 }
 
 final class ModelTest extends TestCase {
-    #[DoesNotPerformAssertions]
     public function testNotThrowsOnValidModel(): void {
         $model = new SampleModel();
         $model->name = 'abcd';
         $model->quantity = 2;
         $model->validate();
+        $this->assertTrue(true);
     }
 
     public function testThrowsOnInvalidModel(): void {

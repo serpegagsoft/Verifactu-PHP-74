@@ -1,8 +1,8 @@
 <?php
 namespace josemmo\Verifactu\Models\Records;
 
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
+use josemmo\Verifactu\Validation\Constraints as Assert;
+use josemmo\Verifactu\Validation\ConstraintViolationList;
 use josemmo\Verifactu\Models\Model;
 
 /**
@@ -19,8 +19,6 @@ class ForeignFiscalIdentifier extends Model {
      *
      * @field NombreRazon
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 120)]
     public string $name;
 
     /**
@@ -28,8 +26,6 @@ class ForeignFiscalIdentifier extends Model {
      *
      * @field IDOtro/CodigoPais
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^[A-Z]{2}$/')]
     public string $country;
 
     /**
@@ -37,24 +33,30 @@ class ForeignFiscalIdentifier extends Model {
      *
      * @field IDOtro/IDType
      */
-    #[Assert\NotBlank]
-    public ForeignIdType $type;
+    public $type;
 
     /**
      * Número de identificación en el país de residencia
      *
      * @field IDOtro/ID
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 20)]
     public string $value;
 
-    #[Assert\Callback]
-    final public function validateCountry(ExecutionContextInterface $context): void {
+    public function getConstraints(): array {
+        return [
+            'name' => [new Assert\NotBlank(), new Assert\Length(['max' => 120])],
+            'country' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^[A-Z]{2}$/']), new Assert\Callback([$this, 'validateCountry'])],
+            'type' => [new Assert\NotBlank()],
+            'value' => [new Assert\NotBlank(), new Assert\Length(['max' => 20])],
+        ];
+    }
+
+    final public function validateCountry(ConstraintViolationList $violations): void {
         if (isset($this->country) && $this->country === 'ES') {
-            $context->buildViolation('Country code cannot be "ES", use the `FiscalIdentifier` model instead')
-                ->atPath('country')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                'Country code cannot be "ES", use the `FiscalIdentifier` model instead',
+                'country'
+            ));
         }
     }
 }

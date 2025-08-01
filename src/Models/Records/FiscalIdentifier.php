@@ -1,7 +1,7 @@
 <?php
 namespace josemmo\Verifactu\Models\Records;
 
-use Symfony\Component\Validator\Constraints as Assert;
+use josemmo\Verifactu\Validation\Constraints as Assert;
 use josemmo\Verifactu\Models\Model;
 
 /**
@@ -19,7 +19,7 @@ class FiscalIdentifier extends Model {
      */
     public function __construct(
         ?string $name = null,
-        ?string $nif = null,
+        ?string $nif = null
     ) {
         if ($name !== null) {
             $this->name = $name;
@@ -34,8 +34,6 @@ class FiscalIdentifier extends Model {
      *
      * @field NombreRazon
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 120)]
     public string $name;
 
     /**
@@ -43,7 +41,12 @@ class FiscalIdentifier extends Model {
      *
      * @field NIF
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(exactly: 9)]
     public string $nif;
+
+    public function getConstraints(): array {
+        return [
+            'name' => [new Assert\NotBlank(), new Assert\Length(['max' => 120])],
+            'nif' => [new Assert\NotBlank(), new Assert\Length(['exactly' => 9])],
+        ];
+    }
 }

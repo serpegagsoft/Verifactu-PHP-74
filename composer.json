@@ -26,18 +26,20 @@
         }
     },
     "require": {
-        "php": ">=8.2",
-        "guzzlehttp/guzzle": "^7.9",
-        "josemmo/uxml": "^0.1.4",
-        "symfony/validator": "^7.3"
+        "php": ">=7.4",
+        "guzzlehttp/guzzle": "^7.8",
+        "josemmo/uxml": "^0.1.4"
     },
     "config": {
+        "platform": {
+            "php": "7.4.33"
+        },
         "process-timeout": 0,
         "sort-packages": true
     },
     "require-dev": {
-        "phpstan/phpstan": "^2.1",
-        "phpstan/phpstan-strict-rules": "^2.0",
-        "phpunit/phpunit": "^11.5|^12.2"
+        "phpstan/phpstan": "^1.0",
+        "phpstan/phpstan-strict-rules": "^1.0",
+        "phpunit/phpunit": "^9.5"
     }
 }

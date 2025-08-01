@@ -10,7 +10,6 @@ use josemmo\Verifactu\Models\Records\RegimeType;
 use josemmo\Verifactu\Models\Records\TaxType;
 
 final class BreakdownDetailsTest extends TestCase {
-    #[DoesNotPerformAssertions]
     public function testValidatesTaxAmount(): void {
         $details = new BreakdownDetails();
         $details->taxType = TaxType::IVA;
@@ -22,6 +21,7 @@ final class BreakdownDetailsTest extends TestCase {
 
         // Should pass validation
         $details->validate();
+        $this->assertTrue(true);
 
         // Wrong tax amount
         $details->taxAmount = '99.99';

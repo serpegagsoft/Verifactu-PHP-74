@@ -1,8 +1,8 @@
 <?php
 namespace josemmo\Verifactu\Models\Records;
 
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
+use josemmo\Verifactu\Validation\Constraints as Assert;
+use josemmo\Verifactu\Validation\ConstraintViolationList;
 
 /**
  * Registro de alta de una factura
@@ -15,8 +15,6 @@ class RegistrationRecord extends Record {
      *
      * @field NombreRazonEmisor
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 120)]
     public string $issuerName;
 
     /**
@@ -24,16 +22,13 @@ class RegistrationRecord extends Record {
      *
      * @field TipoFactura
      */
-    #[Assert\NotBlank]
-    public InvoiceType $invoiceType;
+    public $invoiceType;
 
     /**
      * Descripción del objeto de la factura
      *
      * @field DescripcionOperacion
      */
-    #[Assert\NotBlank]
-    #[Assert\Length(max: 500)]
     public string $description;
 
     /**
@@ -42,8 +37,6 @@ class RegistrationRecord extends Record {
      * @var array<FiscalIdentifier | ForeignFiscalIdentifier>
      * @field Destinatarios
      */
-    #[Assert\Valid]
-    #[Assert\Count(max: 1000)]
     public array $recipients = [];
 
     /**
@@ -52,8 +45,6 @@ class RegistrationRecord extends Record {
      * @var BreakdownDetails[]
      * @field Desglose
      */
-    #[Assert\Valid]
-    #[Assert\Count(min: 1, max: 12)]
     public array $breakdown = [];
 
     /**
@@ -61,8 +52,6 @@ class RegistrationRecord extends Record {
      *
      * @field CuotaTotal
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^-?\d{1,12}\.\d{2}$/')]
     public string $totalTaxAmount;
 
     /**
@@ -70,8 +59,6 @@ class RegistrationRecord extends Record {
      *
      * @field ImporteTotal
      */
-    #[Assert\NotBlank]
-    #[Assert\Regex(pattern: '/^-?\d{1,12}\.\d{2}$/')]
     public string $totalAmount;
 
     /**
@@ -82,7 +69,7 @@ class RegistrationRecord extends Record {
         $payload  = 'IDEmisorFactura=' . $this->invoiceId->issuerId;
         $payload .= '&NumSerieFactura=' . $this->invoiceId->invoiceNumber;
         $payload .= '&FechaExpedicionFactura=' . $this->invoiceId->issueDate->format('d-m-Y');
-        $payload .= '&TipoFactura=' . $this->invoiceType->value;
+        $payload .= '&TipoFactura=' . $this->invoiceType;
         $payload .= '&CuotaTotal=' . $this->totalTaxAmount;
         $payload .= '&ImporteTotal=' . $this->totalAmount;
         $payload .= '&Huella=' . ($this->previousHash ?? '');
@@ -90,8 +77,19 @@ class RegistrationRecord extends Record {
         return strtoupper(hash('sha256', $payload));
     }
 
-    #[Assert\Callback]
-    final public function validateTotals(ExecutionContextInterface $context): void {
+    public function getConstraints(): array {
+        return array_merge(parent::getConstraints(), [
+            'issuerName' => [new Assert\NotBlank(), new Assert\Length(['max' => 120])],
+            'invoiceType' => [new Assert\NotBlank()],
+            'description' => [new Assert\NotBlank(), new Assert\Length(['max' => 500])],
+            'recipients' => [new Assert\Valid(), new Assert\Count(['max' => 1000]), new Assert\Callback([$this, 'validateRecipients'])],
+            'breakdown' => [new Assert\Valid(), new Assert\Count(['min' => 1, 'max' => 12])],
+            'totalTaxAmount' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^-?\d{1,12}\.\d{2}$/'])],
+            'totalAmount' => [new Assert\NotBlank(), new Assert\Regex(['pattern' => '/^-?\d{1,12}\.\d{2}$/']), new Assert\Callback([$this, 'validateTotals'])],
+        ]);
+    }
+
+    final public function validateTotals(ConstraintViolationList $violations): void {
         if (!isset($this->breakdown) || !isset($this->totalTaxAmount) || !isset($this->totalAmount)) {
             return;
         }
@@ -108,9 +106,10 @@ class RegistrationRecord extends Record {
 
         $expectedTotalTaxAmount = number_format($expectedTotalTaxAmount, 2, '.', '');
         if ($this->totalTaxAmount !== $expectedTotalTaxAmount) {
-            $context->buildViolation("Expected total tax amount of $expectedTotalTaxAmount, got {$this->totalTaxAmount}")
-                ->atPath('totalTaxAmount')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                "Expected total tax amount of $expectedTotalTaxAmount, got {$this->totalTaxAmount}",
+                'totalTaxAmount'
+            ));
         }
 
         $validTotalAmount = false;
@@ -124,14 +123,14 @@ class RegistrationRecord extends Record {
         }
         if (!$validTotalAmount) {
             $bestTotalAmount = number_format($bestTotalAmount, 2, '.', '');
-            $context->buildViolation("Expected total amount of $bestTotalAmount, got {$this->totalAmount}")
-                ->atPath('totalAmount')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                "Expected total amount of $bestTotalAmount, got {$this->totalAmount}",
+                'totalAmount'
+            ));
         }
     }
 
-    #[Assert\Callback]
-    final public function validateRecipients(ExecutionContextInterface $context): void {
+    final public function validateRecipients(ConstraintViolationList $violations): void {
         if (!isset($this->invoiceType)) {
             return;
         }
@@ -139,14 +138,16 @@ class RegistrationRecord extends Record {
         $hasRecipients = count($this->recipients) > 0;
         if ($this->invoiceType === InvoiceType::Simplificada || $this->invoiceType === InvoiceType::R5) {
             if ($hasRecipients) {
-                $context->buildViolation('This type of invoice cannot have recipients')
-                    ->atPath('recipients')
-                    ->addViolation();
+                $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                    'This type of invoice cannot have recipients',
+                    'recipients'
+                ));
             }
         } elseif (!$hasRecipients) {
-            $context->buildViolation('This type of invoice requires at least one recipient')
-                ->atPath('recipients')
-                ->addViolation();
+            $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
+                'This type of invoice requires at least one recipient',
+                'recipients'
+            ));
         }
     }
 }

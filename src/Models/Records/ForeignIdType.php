@@ -1,22 +1,22 @@
 <?php
 namespace josemmo\Verifactu\Models\Records;
 
-enum ForeignIdType: string {
+class ForeignIdType {
     /** NIF-IVA */
-    case VAT = '02';
+    const VAT = '02';
 
     /** Pasaporte */
-    case Passport = '03';
+    const Passport = '03';
 
     /** Documento oficial de identificación expedido por el país o territorio de residencia */
-    case NationalId = '04';
+    const NationalId = '04';
 
     /** Certificado de residencia */
-    case Residence = '05';
+    const Residence = '05';
 
     /** Otro documento probatorio */
-    case Other = '06';
+    const Other = '06';
 
     /** No censado */
-    case Unregistered = '07';
+    const Unregistered = '07';
 }
