@@ -5,6 +5,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use UXML\UXML;
 use josemmo\Verifactu\Models\ComputerSystem;
+use josemmo\Verifactu\Models\InvoiceQuery;
 use josemmo\Verifactu\Models\Records\FiscalIdentifier;
 use josemmo\Verifactu\Models\Records\RegistrationRecord;
 
@@ -109,7 +110,7 @@ class AeatClient {
             $idFacturaElement->add('sum1:FechaExpedicionFactura', $record->invoiceId->issueDate->format('d-m-Y'));
 
             $recordElement->add('sum1:NombreRazonEmisor', $record->issuerName);
-            $recordElement->add('sum1:TipoFactura', $record->invoiceType->value);
+            $recordElement->add('sum1:TipoFactura', $record->invoiceType);
             $recordElement->add('sum1:DescripcionOperacion', $record->description);
 
             if (count($record->recipients) > 0) {
@@ -122,7 +123,7 @@ class AeatClient {
                     } else {
                         $idOtroElement = $destinatarioElement->add('sum1:IDOtro');
                         $idOtroElement->add('sum1:CodigoPais', $recipient->country);
-                        $idOtroElement->add('sum1:IDType', $recipient->type->value);
+                        $idOtroElement->add('sum1:IDType', $recipient->type);
                         $idOtroElement->add('sum1:ID', $recipient->value);
                     }
                 }
@@ -131,9 +132,9 @@ class AeatClient {
             $desgloseElement = $recordElement->add('sum1:Desglose');
             foreach ($record->breakdown as $breakdownDetails) {
                 $detalleDesgloseElement = $desgloseElement->add('sum1:DetalleDesglose');
-                $detalleDesgloseElement->add('sum1:Impuesto', $breakdownDetails->taxType->value);
-                $detalleDesgloseElement->add('sum1:ClaveRegimen', $breakdownDetails->regimeType->value);
-                $detalleDesgloseElement->add('sum1:CalificacionOperacion', $breakdownDetails->operationType->value);
+                $detalleDesgloseElement->add('sum1:Impuesto', $breakdownDetails->taxType);
+                $detalleDesgloseElement->add('sum1:ClaveRegimen', $breakdownDetails->regimeType);
+                $detalleDesgloseElement->add('sum1:CalificacionOperacion', $breakdownDetails->operationType);
                 $detalleDesgloseElement->add('sum1:TipoImpositivo', $breakdownDetails->taxRate);
                 $detalleDesgloseElement->add('sum1:BaseImponibleOimporteNoSujeto', $breakdownDetails->baseAmount);
                 $detalleDesgloseElement->add('sum1:CuotaRepercutida', $breakdownDetails->taxAmount);
@@ -168,7 +169,7 @@ class AeatClient {
             $recordElement->add('sum1:TipoHuella', '01'); // SHA-256
             $recordElement->add('sum1:Huella', $record->hash);
         }
-
+        //echo $xml->asXML();
         // Send request
         $response = $this->client->post('/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP', [
             'base_uri' => $this->getBaseUri(),
@@ -178,6 +179,101 @@ class AeatClient {
             'body' => $xml->asXML(),
         ]);
         return UXML::fromString($response->getBody()->getContents());
+    }
+
+    /**
+     * Query invoices from AEAT
+     *
+     * @param  InvoiceQuery $query Query parameters
+     * @return UXML                XML response from web service
+     * @throws GuzzleException if request failed
+     */
+    public function queryInvoices(InvoiceQuery $query): UXML {
+        // Validate the query
+        $query->validate();
+
+        // Build initial request with correct namespaces
+        $xml = UXML::newInstance('soapenv:Envelope', null, [
+            'xmlns:soapenv' => self::NS_SOAPENV,
+            'xmlns:con' => 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/ConsultaLR.xsd',
+            'xmlns:sum' => self::NS_SUM1,
+        ]);
+        $xml->add('soapenv:Header');
+        $baseElement = $xml->add('soapenv:Body')->add('con:ConsultaFactuSistemaFacturacion');
+
+        // Add header with IDVersion (required)
+        $cabeceraElement = $baseElement->add('con:Cabecera');
+        $cabeceraElement->add('sum:IDVersion', '1.0');
+
+        $obligadoEmisionElement = $cabeceraElement->add('sum:ObligadoEmision');
+        $obligadoEmisionElement->add('sum:NombreRazon', $this->taxpayer->name);
+        $obligadoEmisionElement->add('sum:NIF', $this->taxpayer->nif);
+        if ($this->representative !== null) {
+            $representanteElement = $cabeceraElement->add('sum:Representante');
+            $representanteElement->add('sum:NombreRazon', $this->representative->name);
+            $representanteElement->add('sum:NIF', $this->representative->nif);
+        }
+
+        // Add FiltroConsulta (not just Filtro)
+        $filtroElement = $baseElement->add('con:FiltroConsulta');
+
+        // Add PeriodoImputacion (required)
+        $periodoElement = $filtroElement->add('con:PeriodoImputacion');
+        $periodoElement->add('sum:Ejercicio', $query->year);
+        $periodoElement->add('sum:Periodo', $query->period);
+
+        // Optional filters
+        if ($query->seriesNumber !== null) {
+            $filtroElement->add('con:NumSerieFactura', $query->seriesNumber);
+        }
+
+        $counterparty = $query->getCounterparty();
+        if ($counterparty !== null) {
+            $contraparteElement = $filtroElement->add('sum:Contraparte');
+            if (isset($counterparty['nif'])) {
+                $contraparteElement->add('sum:NIF', $counterparty['nif']);
+            }
+            if (isset($counterparty['name'])) {
+                $contraparteElement->add('sum:NombreRazon', $counterparty['name']);
+            }
+        }
+
+        if ($query->issueDate !== null) {
+            $filtroElement->add('sum:FechaExpedicionFactura', $query->issueDate);
+        }
+
+        $systemInfo = $query->getSystemInfo();
+        if ($systemInfo !== null) {
+            $sistemaElement = $filtroElement->add('sum:SistemaInformatico');
+            $sistemaElement->add('sum:NombreSistemaInformatico', $systemInfo['system']);
+            $sistemaElement->add('sum:Version', $systemInfo['version']);
+        }
+
+        if ($query->externalRef !== null) {
+            $filtroElement->add('sum:RefExterna', $query->externalRef);
+        }
+
+        $paginationKey = $query->getPaginationKey();
+        if ($paginationKey !== null) {
+            $claveElement = $filtroElement->add('sum:ClavePaginacion');
+            $claveElement->add('sum:Pagina', (string)$paginationKey['page']);
+            $claveElement->add('sum:TamanoPagina', (string)$paginationKey['size']);
+        }
+
+        $xmlstring = $xml->asXML();
+        // die();
+        // Send request to the correct endpoint (same as registration)
+        $response = $this->client->post('/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP', [
+            'base_uri' => $this->getBaseUri(),
+            'headers' => [
+                'Content-Type' => 'text/xml',
+            ],
+            'body' => $xmlstring,
+        ]);
+        $xml_response = UXML::fromString($response->getBody()->getContents());
+
+        //die($xmlstring . "\n\n" . $xml_response->asXML());
+        return $xml_response;
     }
 
     /**
