@@ -52,7 +52,7 @@ class ForeignFiscalIdentifier extends Model {
     }
 
     final public function validateCountry(ConstraintViolationList $violations): void {
-        if (isset($this->country) && $this->country === 'ES') {
+        if (isset($this->country) && $this->country === 'ES' && $this->type !== ForeignIdType::Unregistered) {
             $violations->add(new \josemmo\Verifactu\Validation\ConstraintViolation(
                 'Country code cannot be "ES", use the `FiscalIdentifier` model instead',
                 'country'
