@@ -24,6 +24,27 @@ class RegistrationRecord extends Record {
      */
     public $invoiceType;
 
+
+    /**
+     * Es una subsanacion
+     * S → Sí, este alta es de subsanación.
+     * N → No, es un alta normal (valor por defecto si no se informa).
+     *
+     * @field Subsanacion
+     */
+    public $correctionType = null;
+
+    /**
+     * HA habído un rechazo previo
+     * X → Se informa cuando el alta se envía después de un rechazo previo de la AEAT.
+     * S → También aparece en validaciones, pero solo válido si al mismo tiempo <Subsanacion> = S.
+     * N → No hay rechazo previo (se omite normalmente).
+     *
+     * @field RechazoPrevio
+     */
+
+    public $previousRejection = null;
+
     /**
      * Descripción del objeto de la factura
      *

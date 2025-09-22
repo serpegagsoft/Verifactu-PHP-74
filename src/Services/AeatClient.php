@@ -78,7 +78,7 @@ class AeatClient {
      * @return UXML                          XML response from web service
      * @throws GuzzleException if request failed
      */
-    public function sendRegistrationRecords(array $records): UXML {
+    public function sendRegistrationRecords(array $records): array {
         // Build initial request
         $xml = UXML::newInstance('soapenv:Envelope', null, [
             'xmlns:soapenv' => self::NS_SOAPENV,
@@ -110,8 +110,21 @@ class AeatClient {
             $idFacturaElement->add('sum1:FechaExpedicionFactura', $record->invoiceId->issueDate->format('d-m-Y'));
 
             $recordElement->add('sum1:NombreRazonEmisor', $record->issuerName);
+
+            if($record->correctionType){
+                $recordElement->add('sum1:Subsanacion', $record->correctionType);
+            }
+            if($record->previousRejection){
+                $recordElement->add('sum1:RechazoPrevio', $record->previousRejection);
+            }
+
             $recordElement->add('sum1:TipoFactura', $record->invoiceType);
             $recordElement->add('sum1:DescripcionOperacion', $record->description);
+
+
+
+
+
 
             if (count($record->recipients) > 0) {
                 $destinatariosElement = $recordElement->add('sum1:Destinatarios');
@@ -134,10 +147,17 @@ class AeatClient {
                 $detalleDesgloseElement = $desgloseElement->add('sum1:DetalleDesglose');
                 $detalleDesgloseElement->add('sum1:Impuesto', $breakdownDetails->taxType);
                 $detalleDesgloseElement->add('sum1:ClaveRegimen', $breakdownDetails->regimeType);
-                $detalleDesgloseElement->add('sum1:CalificacionOperacion', $breakdownDetails->operationType);
-                $detalleDesgloseElement->add('sum1:TipoImpositivo', $breakdownDetails->taxRate);
-                $detalleDesgloseElement->add('sum1:BaseImponibleOimporteNoSujeto', $breakdownDetails->baseAmount);
-                $detalleDesgloseElement->add('sum1:CuotaRepercutida', $breakdownDetails->taxAmount);
+                if(in_array($breakdownDetails->operationType,['E1','E2','E3','E4','E5','E6'])){
+                    // Es una operacion exenta
+                    $detalleDesgloseElement->add('sum1:OperacionExenta', $breakdownDetails->operationType);
+                    $detalleDesgloseElement->add('sum1:BaseImponibleOimporteNoSujeto', $breakdownDetails->baseAmount);
+                } else {
+                    $detalleDesgloseElement->add('sum1:CalificacionOperacion', $breakdownDetails->operationType);
+                    $detalleDesgloseElement->add('sum1:TipoImpositivo', $breakdownDetails->taxRate);
+                    $detalleDesgloseElement->add('sum1:BaseImponibleOimporteNoSujeto', $breakdownDetails->baseAmount);
+                    $detalleDesgloseElement->add('sum1:CuotaRepercutida', $breakdownDetails->taxAmount);
+                }
+
             }
 
             $recordElement->add('sum1:CuotaTotal', $record->totalTaxAmount);
@@ -171,14 +191,19 @@ class AeatClient {
         }
         //echo $xml->asXML();
         // Send request
+        $xmlstring = $xml->asXML();
         $response = $this->client->post('/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP', [
             'base_uri' => $this->getBaseUri(),
             'headers' => [
                 'Content-Type' => 'text/xml',
             ],
-            'body' => $xml->asXML(),
+            'body' => $xmlstring,
         ]);
-        return UXML::fromString($response->getBody()->getContents());
+        return [
+            'request' => $xmlstring,
+            'response' => $response->getBody()->getContents(),
+        ];
+
     }
 
     /**
