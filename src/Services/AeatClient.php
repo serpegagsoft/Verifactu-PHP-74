@@ -72,6 +72,101 @@ class AeatClient {
     }
 
     /**
+     * Send cancellation records
+     *
+     * @param  array $records Cancellation records
+     * @return array          XML response from web service
+     * @throws GuzzleException if request failed
+     */
+    public function sendCancellationRecords(array $records): array {
+        // Build initial request
+        $xml = UXML::newInstance('soapenv:Envelope', null, [
+            'xmlns:soapenv' => self::NS_SOAPENV,
+            'xmlns:sum' => self::NS_SUM,
+            'xmlns:sum1' => self::NS_SUM1,
+        ]);
+        $xml->add('soapenv:Header');
+        $baseElement = $xml->add('soapenv:Body')->add('sum:RegFactuSistemaFacturacion');
+
+        // Add header
+        $cabeceraElement = $baseElement->add('sum:Cabecera');
+        $obligadoEmisionElement = $cabeceraElement->add('sum1:ObligadoEmision');
+        $obligadoEmisionElement->add('sum1:NombreRazon', $this->taxpayer->name);
+        $obligadoEmisionElement->add('sum1:NIF', $this->taxpayer->nif);
+        if ($this->representative !== null) {
+            $representanteElement = $cabeceraElement->add('sum1:Representante');
+            $representanteElement->add('sum1:NombreRazon', $this->representative->name);
+            $representanteElement->add('sum1:NIF', $this->representative->nif);
+        }
+
+        // Add cancellation records
+        foreach ($records as $record) {
+            $recordElement = $baseElement->add('sum:RegistroFactura')->add('sum1:RegistroAnulacion');
+            $recordElement->add('sum1:IDVersion', '1.0');
+
+            $idFacturaElement = $recordElement->add('sum1:IDFactura');
+            $idFacturaElement->add('sum1:IDEmisorFacturaAnulada', $record->invoiceId->issuerId);
+            $idFacturaElement->add('sum1:NumSerieFacturaAnulada', $record->invoiceId->invoiceNumber);
+            $idFacturaElement->add('sum1:FechaExpedicionFacturaAnulada', $record->invoiceId->issueDate->format('d-m-Y'));
+
+            // Optional fields for cancellation records
+            if ($record->noPreviousRecord) {
+                $recordElement->add('sum1:SinRegistroPrevio', $record->noPreviousRecord);
+            }
+            if ($record->previousRejection) {
+                $recordElement->add('sum1:RechazoPrevio', $record->previousRejection);
+            }
+            if ($record->generator) {
+                $recordElement->add('sum1:GeneradoPor', $record->generator);
+            }
+            if ($record->generatorData) {
+                $recordElement->add('sum1:Generador', $record->generatorData);
+            }
+
+            $encadenamientoElement = $recordElement->add('sum1:Encadenamiento');
+            if ($record->previousInvoiceId === null) {
+                $encadenamientoElement->add('sum1:PrimerRegistro');
+            } else {
+                $registroAnteriorElement = $encadenamientoElement->add('sum1:RegistroAnterior');
+                $registroAnteriorElement->add('sum1:IDEmisorFactura', $record->previousInvoiceId->issuerId);
+                $registroAnteriorElement->add('sum1:NumSerieFactura', $record->previousInvoiceId->invoiceNumber);
+                $registroAnteriorElement->add('sum1:FechaExpedicionFactura', $record->previousInvoiceId->issueDate->format('d-m-Y'));
+                $registroAnteriorElement->add('sum1:Huella', $record->previousHash);
+            }
+
+            $sistemaInformaticoElement = $recordElement->add('sum1:SistemaInformatico');
+            $sistemaInformaticoElement->add('sum1:NombreRazon', $this->system->vendorName);
+            $sistemaInformaticoElement->add('sum1:NIF', $this->system->vendorNif);
+            $sistemaInformaticoElement->add('sum1:NombreSistemaInformatico', $this->system->name);
+            $sistemaInformaticoElement->add('sum1:IdSistemaInformatico', $this->system->id);
+            $sistemaInformaticoElement->add('sum1:Version', $this->system->version);
+            $sistemaInformaticoElement->add('sum1:NumeroInstalacion', $this->system->installationNumber);
+            $sistemaInformaticoElement->add('sum1:TipoUsoPosibleSoloVerifactu', $this->system->onlySupportsVerifactu ? 'S' : 'N');
+            $sistemaInformaticoElement->add('sum1:TipoUsoPosibleMultiOT', $this->system->supportsMultipleTaxpayers ? 'S' : 'N');
+            $sistemaInformaticoElement->add('sum1:IndicadorMultiplesOT', $this->system->hasMultipleTaxpayers ? 'S' : 'N');
+
+            $recordElement->add('sum1:FechaHoraHusoGenRegistro', $record->hashedAt->format('c'));
+            $recordElement->add('sum1:TipoHuella', '01'); // SHA-256
+            $recordElement->add('sum1:Huella', $record->hash);
+        }
+
+        // Send request
+        $xmlstring = $xml->asXML();
+        $response = $this->client->post('/wlpl/TIKE-CONT/ws/SistemaFacturacion/VerifactuSOAP', [
+            'base_uri' => $this->getBaseUri(),
+            'headers' => [
+                'Content-Type' => 'text/xml',
+            ],
+            'body' => $xmlstring,
+        ]);
+        return [
+            'request' => $xmlstring,
+            'response' => $response->getBody()->getContents(),
+        ];
+
+    }
+
+    /**
      * Send registration records
      *
      * @param  RegistrationRecord[] $records Registration records
@@ -119,9 +214,43 @@ class AeatClient {
             }
 
             $recordElement->add('sum1:TipoFactura', $record->invoiceType);
+
+            // TipoRectificativa (optional)
+            if (!empty($record->rectificationType)) {
+                $recordElement->add('sum1:TipoRectificativa', $record->rectificationType);
+            }
+
+            if(count($record->rectified) > 0){
+                $rectifiedElement = $recordElement->add('sum1:FacturasRectificadas');
+                foreach ($record->rectified as $rectifiedInvoice) {
+                    $facturaRectificadaElement = $rectifiedElement->add('sum1:IDFacturaRectificada');
+                    $facturaRectificadaElement->add('sum1:IDEmisorFactura', $rectifiedInvoice->issuerId);
+                    $facturaRectificadaElement->add('sum1:NumSerieFactura', $rectifiedInvoice->invoiceNumber);
+                    $facturaRectificadaElement->add('sum1:FechaExpedicionFactura', $rectifiedInvoice->issueDate->format('d-m-Y'));
+
+                }
+            }
+
+            // FacturasSustituidas (optional)
+
+            if(count($record->substituted) > 0){
+                $substitutedElement = $recordElement->add('sum1:FacturasSustituidas');
+                foreach ($record->substituted as $substitutedInvoice) {
+                    $facturaSustituidaElement = $substitutedElement->add('sum1:IDFacturaSustituida');
+                    $facturaSustituidaElement->add('sum1:IDEmisorFactura', $substitutedInvoice->issuerId);
+                    $facturaSustituidaElement->add('sum1:NumSerieFactura', $substitutedInvoice->invoiceNumber);
+                    $facturaSustituidaElement->add('sum1:FechaExpedicionFactura', $substitutedInvoice->issueDate->format('d-m-Y'));
+
+                }
+            }
+
+            /// clean description from special characters not allowed in XML and non encodable in UTF-8
+            $record->description = preg_replace('/[^\x{0009}\x{000A}\x{000D}\x{0020}-\x{D7FF}\x{E000}-\x{FFFD}]+/u', ' ', $record->description);
+            $record->description = mb_substr($record->description, 0, 200, 'UTF-8');
+
+
+
             $recordElement->add('sum1:DescripcionOperacion', $record->description);
-
-
 
 
 
@@ -307,6 +436,6 @@ class AeatClient {
      * @return string Base URI
      */
     private function getBaseUri(): string {
-        return $this->isProduction ? 'https://www1.aeat.es' : 'https://prewww1.aeat.es';
+        return $this->isProduction ? 'https://www1.aeatggg.esmalnousaraunnn' : 'https://prewww1.aeat.es';
     }
 }

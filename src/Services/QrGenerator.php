@@ -8,7 +8,7 @@ use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
-use josemmo\Verifactu\Models\Records\Record;
+use josemmo\Verifactu\Models\Records\RegistrationRecord;
 
 /**
  * Service responsible for generating QR codes for invoices according to the AEAT Verifactu specification.
@@ -37,25 +37,25 @@ use josemmo\Verifactu\Models\Records\Record;
  * $record = new InvoiceRecord($invoiceId, 'abcdef123456789');
  *
  * // Generate QR code as SVG string
- * $svgQrCode = QrGeneratorService::generateQr(
+ * $svgQrCode = QrGenerator::generateQr(
  *     $record,
  *     'https://sede.agenciatributaria.gob.es/verifactu',
- *     QrGeneratorService::DESTINATION_STRING,
+ *     QrGenerator::DESTINATION_STRING,
  *     400,
- *     QrGeneratorService::RENDERER_SVG
+ *     QrGenerator::RENDERER_SVG
  * );
  *
  * // Generate QR code as PNG file
- * $pngFilePath = QrGeneratorService::generateQr(
+ * $pngFilePath = QrGenerator::generateQr(
  *     $record,
  *     'https://sede.agenciatributaria.gob.es/verifactu',
- *     QrGeneratorService::DESTINATION_FILE,
+ *     QrGenerator::DESTINATION_FILE,
  *     300,
- *     QrGeneratorService::RENDERER_GD
+ *     QrGenerator::RENDERER_GD
  * );
  * ```
  */
-class QrGeneratorService
+class QrGenerator
 {
     /**
      * Destination constants
@@ -74,7 +74,7 @@ class QrGeneratorService
      * Generates a QR code for a given invoice record,
      * using the AEAT Verifactu QR specification (URL and fields).
      *
-     * @param Record $record
+     * @param RegistrationRecord $record
      * @param string $baseVerificationUrl Base URL for AEAT invoice verification
      * @param string $dest Destination type (file or string)
      * @param int $size Resolution of the QR code
@@ -83,7 +83,7 @@ class QrGeneratorService
      * @throws \RuntimeException
      */
     public static function generateQr(
-        Record $record,
+        RegistrationRecord $record,
                       $baseVerificationUrl,
                       $dest = self::DESTINATION_STRING,
                       $size = 300,
@@ -106,22 +106,24 @@ class QrGeneratorService
     /**
      * Builds the QR content string according to AEAT specification.
      *
-     * @param Record $record
+     * @param RegistrationRecord $record
      * @param string $baseVerificationUrl
      * @return string
      */
-    protected static function buildQrContent(Record $record, $baseVerificationUrl)
+    protected static function buildQrContent(RegistrationRecord $record, $baseVerificationUrl)
     {
         $invoiceId = $record->invoiceId;
         $nif = $invoiceId->issuerId;
         $series = $invoiceId->invoiceNumber;
         $date = $invoiceId->issueDate->format('d-m-Y');
+        $importe = $record->totalAmount;
         $hash = $record->hash;
 
         $params = http_build_query([
             'nif' => $nif,
-            'num' => $series,
+            'numserie' => $series,
             'fecha' => $date,
+            'importe' => $importe,
             'huella' => $hash,
         ]);
 
@@ -140,18 +142,18 @@ class QrGeneratorService
     {
         switch ($renderer) {
             case self::RENDERER_GD:
-                return new Writer(new GDLibRenderer($resolution));
+                return new Writer(new GDLibRenderer($resolution, 0));
 
             case self::RENDERER_IMAGICK:
                 $imageRenderer = new ImageRenderer(
-                    new RendererStyle($resolution),
+                    new RendererStyle($resolution, 0),
                     new ImagickImageBackEnd()
                 );
                 return new Writer($imageRenderer);
 
             case self::RENDERER_SVG:
                 $imageRenderer = new ImageRenderer(
-                    new RendererStyle($resolution),
+                    new RendererStyle($resolution, 0),
                     new SvgImageBackEnd()
                 );
                 return new Writer($imageRenderer);

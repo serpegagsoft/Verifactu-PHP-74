@@ -24,6 +24,14 @@ class RegistrationRecord extends Record {
      */
     public $invoiceType;
 
+    /**
+     * Especificación del tipo rectificativa de la factura, en caso de que lo sea
+     *
+     * @field TipoRectificativa
+     */
+
+    public $rectificationType = null;
+
 
     /**
      * Es una subsanacion
@@ -81,6 +89,24 @@ class RegistrationRecord extends Record {
      * @field ImporteTotal
      */
     public string $totalAmount;
+
+    /**
+     * Facturas que se sustituyen con esta
+     *
+     * @var InvoiceIdentifier[]
+     * @field FacturasSustituidas
+     */
+    public array $substituted = [];
+
+    /**
+     * Facturas que se sustituyen con esta
+     *
+     * @var InvoiceIdentifier[]
+     * @field FacturasRectificadas
+     */
+    public array $rectified = [];
+
+
 
     /**
      * @inheritDoc
